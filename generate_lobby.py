@@ -10,86 +10,94 @@ response = requests.get(URL, timeout=20)
 response.raise_for_status()
 
 soup = BeautifulSoup(response.text, "html.parser")
-text = soup.get_text("\n", strip=True)
 
-lines = [line.strip() for line in text.splitlines() if line.strip()]
+# Get visible text
+lines = [
+    x.strip()
+    for x in soup.get_text("\n", strip=True).splitlines()
+    if x.strip()
+]
 
-periods = {}
-current_period = None
+# Remove obvious website clutter
+ignore = [
+    "Practice Room Schedule",
+    "Refreshes every 5 minutes",
+    "Loading...",
+]
 
-for line in lines:
-    if line.startswith("Period "):
-        current_period = line
-        periods[current_period] = []
-    elif current_period:
-        if line not in {
-            "Unavailable",
-            "Loading...",
-            "Refreshes every 5 minutes",
-            "Schedule date",
-            "Today",
-        }:
-            periods[current_period].append(line)
+lines = [
+    line for line in lines
+    if line not in ignore
+]
 
-# Create 1920 x 1080 image
-img = Image.new("RGB", (1920, 1080), "white")
+# Canvas
+WIDTH = 1920
+HEIGHT = 1080
+
+img = Image.new("RGB", (WIDTH, HEIGHT), "white")
 draw = ImageDraw.Draw(img)
 
-# Fonts
-try:
-    title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 72)
-    date_font = ImageFont.truetype("DejaVuSans.ttf", 38)
-    period_font = ImageFont.truetype("DejaVuSans-Bold.ttf", 38)
-    text_font = ImageFont.truetype("DejaVuSans.ttf", 28)
-except:
-    title_font = ImageFont.load_default()
-    date_font = ImageFont.load_default()
-    period_font = ImageFont.load_default()
-    text_font = ImageFont.load_default()
+def font(size, bold=False):
+    name = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
+    return ImageFont.truetype(name, size)
 
+# HEADER
 draw.text(
-    (80, 50),
-    "Practice Room Reservations",
-    font=title_font,
+    (80, 45),
+    "PRACTICE ROOM RESERVATIONS",
+    font=font(64, True),
     fill="black"
 )
 
 draw.text(
-    (82, 145),
+    (82, 125),
     datetime.now().strftime("%A, %B %d, %Y"),
-    font=date_font,
+    font=font(32),
     fill="black"
 )
 
-x_positions = [80, 680, 1280]
-y_start = 230
-column = 0
-y = y_start
+# Divider
+draw.line((80, 185, 1840, 185), fill="black", width=3)
 
-for period, entries in periods.items():
-    if y > 900:
-        column += 1
-        if column >= len(x_positions):
-            break
-        y = y_start
+# Split information into two columns
+midpoint = (len(lines) + 1) // 2
 
-    x = x_positions[column]
+columns = [
+    lines[:midpoint],
+    lines[midpoint:]
+]
 
-    draw.text((x, y), period, font=period_font, fill="black")
-    y += 55
+x_positions = [90, 990]
 
-    for entry in entries:
-        if y > 930:
-            column += 1
-            if column >= len(x_positions):
-                break
-            x = x_positions[column]
-            y = y_start
+for col_num, column in enumerate(columns):
 
-        draw.text((x + 20, y), entry, font=text_font, fill="black")
-        y += 38
+    x = x_positions[col_num]
+    y = 225
 
-    y += 30
+    # Dynamically size text
+    available_height = 790
+    count = max(len(column), 1)
+
+    line_height = min(48, available_height // count)
+    text_size = max(20, min(34, line_height - 7))
+
+    for line in column:
+
+        # Make periods stand out
+        if line.lower().startswith("period"):
+            f = font(text_size + 5, True)
+            y += 10
+        else:
+            f = font(text_size)
+
+        draw.text(
+            (x, y),
+            line[:52],
+            font=f,
+            fill="black"
+        )
+
+        y += line_height
 
 img.save(OUTPUT)
-print(f"Created {OUTPUT}")
+print("Created lobby.png")
