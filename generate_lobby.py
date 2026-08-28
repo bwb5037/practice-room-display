@@ -21,13 +21,6 @@ ROOM_NAMES = [
     "Piano Lab",
 ]
 
-ENSEMBLES = [
-    "String Orchestra",
-    "Concert Orchestra",
-    "Symphonic Band",
-    "Wind Symphony",
-]
-
 # --------------------------------------------------
 # GET PAGE
 # --------------------------------------------------
@@ -50,22 +43,8 @@ lines = [
 periods = {i: [] for i in range(1, 11)}
 current_period = None
 
-i = 0
+for line in lines:
 
-while i < len(lines):
-
-    line = lines[i]
-
-    # Handles "Period" then "4"
-    if line == "Period" and i + 1 < len(lines) and lines[i + 1].isdigit():
-        number = int(lines[i + 1])
-
-        if 1 <= number <= 10:
-            current_period = number
-            i += 2
-            continue
-
-    # Handles "Period 4"
     match = re.match(r"^Period\s+(\d+)$", line, re.IGNORECASE)
 
     if match:
@@ -73,14 +52,11 @@ while i < len(lines):
 
         if 1 <= number <= 10:
             current_period = number
-            i += 1
-            continue
+
+        continue
 
     if current_period is not None:
         periods[current_period].append(line)
-
-    i += 1
-
 
 # --------------------------------------------------
 # FIND ROOM + STUDENT PAIRS
@@ -108,45 +84,26 @@ for period, entries in periods.items():
             i += 1
             continue
 
-        # Usually the NEXT line is either Unavailable
-        # or the student name(s).
+        # The next line contains either the student(s)
+        # or "Unavailable"
         if i + 1 >= len(entries):
             i += 1
             continue
 
-        next_line = entries[i + 1].strip()
+        student_line = entries[i + 1].strip()
 
-        if next_line.lower() == "unavailable":
+        if student_line.lower() == "unavailable":
             i += 2
             continue
 
-        # Do not accidentally use another room or period
-        if detect_room(next_line):
+        # Safety: don't treat another room as a student
+        if detect_room(student_line):
             i += 1
             continue
 
-        if next_line.lower().startswith("period"):
-            i += 1
-            continue
-
-        students = next_line
-
-        # Final safety cleanup
-        student_parts = [
-            p.strip()
-            for p in students.split(",")
-            if p.strip()
-        ]
-
-        student_parts = [
-            p for p in student_parts
-            if p not in ENSEMBLES and p.lower() != "none"
-        ]
-
-        if student_parts:
-            reservations[period].append(
-                (room, ", ".join(student_parts))
-            )
+        reservations[period].append(
+            (room, student_line)
+        )
 
         i += 2
 
@@ -163,11 +120,13 @@ for period, items in reservations.items():
 
         combined[period].setdefault(room, [])
 
-        for student in [
-            s.strip()
-            for s in student_string.split(",")
-            if s.strip()
-        ]:
+        students = [
+            student.strip()
+            for student in student_string.split(",")
+            if student.strip()
+        ]
+
+        for student in students:
             if student not in combined[period][room]:
                 combined[period][room].append(student)
 
@@ -175,14 +134,16 @@ for period, items in reservations.items():
 reservations = {i: [] for i in range(1, 11)}
 
 for period in range(1, 11):
+
     for room, students in combined[period].items():
+
         reservations[period].append(
             (room, ", ".join(students))
         )
 
 
 # --------------------------------------------------
-# IMAGE
+# CREATE IMAGE
 # --------------------------------------------------
 
 img = Image.new(
@@ -222,7 +183,9 @@ draw.line(
 )
 
 
+# --------------------------------------------------
 # PERIOD CARDS
+# --------------------------------------------------
 
 margin_x = 65
 top = 205
@@ -274,7 +237,6 @@ for period in range(1, 11):
     )
 
     y = y1 + 92
-
     items = reservations[period]
 
     if not items:
@@ -294,10 +256,12 @@ for period in range(1, 11):
             room_font = font(20, True)
             name_font = font(19)
             spacing = 83
+
         elif count <= 4:
             room_font = font(18, True)
             name_font = font(17)
             spacing = 70
+
         else:
             room_font = font(16, True)
             name_font = font(15)
