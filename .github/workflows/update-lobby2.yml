@@ -40,13 +40,13 @@ jobs:
 
           echo "$TIMESTAMP" > /tmp/timestamp.txt
 
-      - name: Build WildStream media list
+      -      - name: Build PupCast playlist
         run: |
           TIMESTAMP=$(cat /tmp/timestamp.txt)
 
           cat > /tmp/media.csv <<EOF
-          Title,URL,Description,Type,DisplayDuration
-          Practice Rooms,https://raw.githubusercontent.com/bwb5037/practice-room-display/refs/heads/main/lobby-$TIMESTAMP.png,Practice room reservations,Photo,30
+          URL,Duration,Type
+          https://raw.githubusercontent.com/bwb5037/practice-room-display/refs/heads/main/lobby-$TIMESTAMP.png,30,image
           EOF
 
       - name: Save updated files
