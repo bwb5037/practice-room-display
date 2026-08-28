@@ -97,9 +97,30 @@ for text in raw_lines:
 periods = {i: [] for i in range(1, 11)}
 current_period = None
 
-for line in lines:
+i = 0
 
-    match = re.fullmatch(r"Period\s+(\d+)", line, re.IGNORECASE)
+while i < len(lines):
+
+    line = lines[i]
+
+    # Handles "Period" and "1" as separate strings
+    if line.lower() == "period" and i + 1 < len(lines):
+
+        if lines[i + 1].isdigit():
+
+            number = int(lines[i + 1])
+
+            if 1 <= number <= 10:
+                current_period = number
+                i += 2
+                continue
+
+    # Handles "Period 1" as one string
+    match = re.fullmatch(
+        r"Period\s+(\d+)",
+        line,
+        re.IGNORECASE
+    )
 
     if match:
 
@@ -107,12 +128,13 @@ for line in lines:
 
         if 1 <= number <= 10:
             current_period = number
-
-        continue
+            i += 1
+            continue
 
     if current_period is not None:
         periods[current_period].append(line)
 
+    i += 1
 
 # --------------------------------------------------
 # PARSE RESERVATIONS
