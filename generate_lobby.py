@@ -42,9 +42,9 @@ with sync_playwright() as p:
 
    text = page.locator("body").inner_text()
 
-print("\n--- RAW PAGE TEXT START ---")
-print(text)
-print("--- RAW PAGE TEXT END ---\n")
+    print("\n--- RAW PAGE TEXT START ---")
+    print(text)
+    print("--- RAW PAGE TEXT END ---\n")
 
 browser.close()
 
