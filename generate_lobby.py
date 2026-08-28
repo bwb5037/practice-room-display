@@ -40,9 +40,13 @@ with sync_playwright() as p:
     # Give the schedule JS a moment to finish
     page.wait_for_timeout(3000)
 
-    text = page.locator("body").inner_text()
+   text = page.locator("body").inner_text()
 
-    browser.close()
+print("\n--- RAW PAGE TEXT START ---")
+print(text)
+print("--- RAW PAGE TEXT END ---\n")
+
+browser.close()
 
 lines = [
     line.strip()
