@@ -37,7 +37,16 @@ jobs:
           python generate_lobby.py
           cp lobby.png /tmp/lobby.png
 
-      - name: Save updated image
+      - name: Build WildStream media list
+        run: |
+          TIMESTAMP=$(date +%s)
+
+          cat > /tmp/media.csv <<EOF
+          Title,URL,Description,Type,DisplayDuration
+          Practice Rooms,https://raw.githubusercontent.com/bwb5037/practice-room-display/refs/heads/main/lobby.png?v=$TIMESTAMP,Practice room reservations,Photo,30
+          EOF
+
+      - name: Save updated files
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -46,7 +55,9 @@ jobs:
           git reset --hard origin/main
 
           cp /tmp/lobby.png lobby.png
-          git add lobby.png
+          cp /tmp/media.csv media.csv
+
+          git add lobby.png media.csv
 
           if git diff --cached --quiet; then
             echo "No changes to commit"
