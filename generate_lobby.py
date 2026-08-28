@@ -21,15 +21,8 @@ ROOM_NAMES = [
     "Piano Lab",
 ]
 
-ENSEMBLE_NAMES = [
-    "String Orchestra",
-    "Concert Orchestra",
-    "Symphonic Band",
-    "Wind Symphony",
-]
-
 # --------------------------------------------------
-# GET PAGE
+# DOWNLOAD PAGE
 # --------------------------------------------------
 
 response = requests.get(URL, timeout=20)
@@ -37,58 +30,12 @@ response.raise_for_status()
 
 soup = BeautifulSoup(response.text, "html.parser")
 
-# Get text, but normalize it carefully.
-raw_lines = [
-    x.strip()
-    for x in soup.stripped_strings
-    if x.strip()
+# Important: use the page's visible text exactly as separate lines
+lines = [
+    line.strip()
+    for line in soup.get_text("\n", strip=True).splitlines()
+    if line.strip()
 ]
-
-# --------------------------------------------------
-# NORMALIZE LINES
-# --------------------------------------------------
-
-lines = []
-
-for text in raw_lines:
-
-    # Some HTML elements contain room + ensemble + student
-    # all in one BeautifulSoup string.
-    # Split student names away from ensemble names.
-
-    working = text
-
-    # If this begins with a room, process specially
-    room_found = None
-
-    for room in ROOM_NAMES:
-        if working.startswith(room):
-            room_found = room
-            break
-
-    if room_found:
-
-        remainder = working[len(room_found):].strip()
-
-        # Remove ensemble names from beginning
-        ensemble_text = remainder
-
-        for ensemble in ENSEMBLE_NAMES:
-            ensemble_text = ensemble_text.replace(ensemble, "")
-
-        ensemble_text = ensemble_text.replace(",", " ").strip()
-
-        # Keep original room line
-        lines.append(working)
-
-        # If anything remains after removing ensemble names,
-        # it should be student text
-        if ensemble_text:
-            lines.append(ensemble_text)
-
-    else:
-        lines.append(working)
-
 
 # --------------------------------------------------
 # PARSE PERIODS
@@ -97,61 +44,34 @@ for text in raw_lines:
 periods = {i: [] for i in range(1, 11)}
 current_period = None
 
-i = 0
+for line in lines:
 
-while i < len(lines):
-
-    line = lines[i]
-
-    # Handles "Period" and "1" as separate strings
-    if line.lower() == "period" and i + 1 < len(lines):
-
-        if lines[i + 1].isdigit():
-
-            number = int(lines[i + 1])
-
-            if 1 <= number <= 10:
-                current_period = number
-                i += 2
-                continue
-
-    # Handles "Period 1" as one string
-    match = re.fullmatch(
-        r"Period\s+(\d+)",
-        line,
-        re.IGNORECASE
-    )
+    match = re.fullmatch(r"Period\s+(\d+)", line, re.IGNORECASE)
 
     if match:
-
         number = int(match.group(1))
 
         if 1 <= number <= 10:
             current_period = number
-            i += 1
-            continue
+
+        continue
 
     if current_period is not None:
         periods[current_period].append(line)
 
-    i += 1
 
 # --------------------------------------------------
 # PARSE RESERVATIONS
 # --------------------------------------------------
 
-reservations = {i: [] for i in range(1, 11)}
-
-
-def get_room(line):
-
+def detect_room(line):
     for room in ROOM_NAMES:
-
         if line.startswith(room):
             return room
-
     return None
 
+
+reservations = {i: [] for i in range(1, 11)}
 
 for period, entries in periods.items():
 
@@ -159,58 +79,29 @@ for period, entries in periods.items():
 
     while i < len(entries):
 
-        line = entries[i]
-
-        room = get_room(line)
+        room = detect_room(entries[i])
 
         if room is None:
             i += 1
             continue
 
-        # Remove room name
-        remainder = line[len(room):].strip()
-
-        # Remove ensemble names
-        student_text = remainder
-
-        for ensemble in ENSEMBLE_NAMES:
-            student_text = student_text.replace(ensemble, "")
-
-        student_text = student_text.strip(" ,")
-
-        # If student name is embedded in same HTML string
-        if student_text:
-
-            reservations[period].append(
-                (room, student_text)
-            )
-
-            i += 1
-            continue
-
-        # Otherwise student should be next line
+        # The live page puts the student(s) on the NEXT line.
         if i + 1 < len(entries):
 
-            candidate = entries[i + 1].strip()
+            student_line = entries[i + 1].strip()
 
             if (
-                candidate.lower() != "unavailable"
-                and get_room(candidate) is None
-                and not candidate.lower().startswith("period")
+                student_line.lower() != "unavailable"
+                and detect_room(student_line) is None
+                and not re.fullmatch(
+                    r"Period\s+\d+",
+                    student_line,
+                    re.IGNORECASE
+                )
             ):
-
-                # Make sure candidate isn't only an ensemble
-                cleaned = candidate
-
-                for ensemble in ENSEMBLE_NAMES:
-                    cleaned = cleaned.replace(ensemble, "")
-
-                cleaned = cleaned.strip(" ,")
-
-                if cleaned:
-                    reservations[period].append(
-                        (room, cleaned)
-                    )
+                reservations[period].append(
+                    (room, student_line)
+                )
 
         i += 2
 
@@ -260,13 +151,7 @@ draw = ImageDraw.Draw(img)
 
 
 def font(size, bold=False):
-
-    filename = (
-        "DejaVuSans-Bold.ttf"
-        if bold
-        else "DejaVuSans.ttf"
-    )
-
+    filename = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
     return ImageFont.truetype(filename, size)
 
 
@@ -294,7 +179,7 @@ draw.line(
 
 
 # --------------------------------------------------
-# CARDS
+# PERIOD CARDS
 # --------------------------------------------------
 
 margin_x = 65
@@ -347,7 +232,6 @@ for period in range(1, 11):
     )
 
     y = y1 + 92
-
     items = reservations[period]
 
     if not items:
@@ -410,8 +294,7 @@ draw.text(
 img.save(OUTPUT)
 
 print("Created lobby.png")
-
-print("\n--- PARSED RESERVATIONS ---")
+print("--- PARSED RESERVATIONS ---")
 
 for period in range(1, 11):
     print(f"Period {period}: {reservations[period]}")
