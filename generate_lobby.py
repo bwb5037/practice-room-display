@@ -70,7 +70,6 @@ while i < len(lines):
 
     i += 1
 
-
 # --------------------------------------------------
 # CLEAN ROOM / NAME PAIRS
 # --------------------------------------------------
@@ -108,8 +107,6 @@ for period, entries in periods.items():
         j = i + 1
         students = []
 
-        # Read everything belonging to this room
-        # until we reach the next room.
         while j < len(entries) and entries[j] not in room_names:
 
             candidate = entries[j].strip()
@@ -118,27 +115,32 @@ for period, entries in periods.items():
                 j += 1
                 continue
 
-            # Split comma-separated content
             parts = [
                 part.strip()
                 for part in candidate.split(",")
                 if part.strip()
             ]
 
-            # Remove ensemble/class names but preserve people
-            cleaned_parts = []
-
             for part in parts:
-                if part not in ensemble_names:
-                    cleaned_parts.append(part)
 
-            if cleaned_parts:
-                students.extend(cleaned_parts)
+                # Remove any ensemble/class labels
+                if any(
+                    part.lower() == ensemble.lower()
+                    for ensemble in ensemble_names
+                ):
+                    continue
+
+                # Ignore period markers
+                if part.lower().startswith("period"):
+                    continue
+
+                students.append(part)
 
             j += 1
 
         if students:
-            # Remove duplicates while preserving order
+
+            # Remove duplicates but preserve order
             students = list(dict.fromkeys(students))
 
             reservations[period].append(
@@ -161,13 +163,12 @@ for period, items in reservations.items():
         if room not in combined[period]:
             combined[period][room] = []
 
-        students = [
-            name.strip()
-            for name in student_string.split(",")
-            if name.strip()
-        ]
+        for student in [
+            s.strip()
+            for s in student_string.split(",")
+            if s.strip()
+        ]:
 
-        for student in students:
             if student not in combined[period][room]:
                 combined[period][room].append(student)
 
