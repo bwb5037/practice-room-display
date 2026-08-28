@@ -2,8 +2,6 @@ name: Update Lobby Display
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "2-57/5 * * * *"
 
 permissions:
   contents: write
@@ -35,15 +33,20 @@ jobs:
       - name: Generate lobby image
         run: |
           python generate_lobby.py
-          cp lobby.png /tmp/lobby.png
+
+          TIMESTAMP=$(date +%s)
+
+          cp lobby.png "/tmp/lobby-$TIMESTAMP.png"
+
+          echo "$TIMESTAMP" > /tmp/timestamp.txt
 
       - name: Build WildStream media list
         run: |
-          TIMESTAMP=$(date +%s)
+          TIMESTAMP=$(cat /tmp/timestamp.txt)
 
           cat > /tmp/media.csv <<EOF
           Title,URL,Description,Type,DisplayDuration
-          Practice Rooms,https://raw.githubusercontent.com/bwb5037/practice-room-display/refs/heads/main/lobby.png?v=$TIMESTAMP,Practice room reservations,Photo,30
+          Practice Rooms,https://raw.githubusercontent.com/bwb5037/practice-room-display/refs/heads/main/lobby-$TIMESTAMP.png,Practice room reservations,Photo,30
           EOF
 
       - name: Save updated files
@@ -54,10 +57,18 @@ jobs:
           git fetch origin main
           git reset --hard origin/main
 
-          cp /tmp/lobby.png lobby.png
+          TIMESTAMP=$(cat /tmp/timestamp.txt)
+
+          cp "/tmp/lobby-$TIMESTAMP.png" "lobby-$TIMESTAMP.png"
+          cp "/tmp/lobby-$TIMESTAMP.png" lobby.png
           cp /tmp/media.csv media.csv
 
-          git add lobby.png media.csv
+          # Remove previous timestamped lobby images
+          find . -maxdepth 1 -type f -name 'lobby-*.png' \
+            ! -name "lobby-$TIMESTAMP.png" \
+            -delete
+
+          git add -A
 
           if git diff --cached --quiet; then
             echo "No changes to commit"
