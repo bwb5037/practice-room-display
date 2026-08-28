@@ -79,6 +79,10 @@ while i < len(lines):
 # CLEAN ROOM / NAME PAIRS
 # --------------------------------------------------
 
+# --------------------------------------------------
+# CLEAN ROOM / NAME PAIRS
+# --------------------------------------------------
+
 room_names = {
     "Lunch Table",
     "Practice Room 2",
@@ -111,25 +115,42 @@ for period, entries in periods.items():
             room = entry
             j = i + 1
 
-            # Skip ensemble/class names after the room
-            while j < len(entries) and entries[j] in ensemble_names:
-                j += 1
+            # Skip any ensemble/class labels
+            while j < len(entries):
 
-            # The next item should now be the student's name
-            if (
-                j < len(entries)
-                and entries[j] not in room_names
-                and entries[j].lower() != "unavailable"
-            ):
-                student = entries[j]
+                candidate = entries[j]
 
-                # Avoid accidentally treating another period marker as a name
+                # Stop if we've reached another room
+                if candidate in room_names:
+                    break
+
+                # Skip unavailable
+                if candidate.lower() == "unavailable":
+                    j += 1
+                    continue
+
+                # Skip any line containing ensemble names
+                # even if multiple ensembles are listed together
+                contains_ensemble = any(
+                    ensemble.lower() in candidate.lower()
+                    for ensemble in ensemble_names
+                )
+
+                if contains_ensemble:
+                    j += 1
+                    continue
+
+                # Anything else should be the student name(s)
+                student = candidate
+
                 if not student.lower().startswith("period"):
                     reservations[period].append(
                         (room, student)
                     )
 
-            i = j + 1
+                break
+
+            i = max(j + 1, i + 1)
 
         else:
             i += 1
