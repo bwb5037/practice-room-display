@@ -1,5 +1,4 @@
-import requests
-from bs4 import BeautifulSoup
+from playwright.sync_api import sync_playwright
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
 import re
@@ -21,19 +20,33 @@ ROOM_NAMES = [
     "Piano Lab",
 ]
 
+ENSEMBLES = [
+    "String Orchestra",
+    "Concert Orchestra",
+    "Symphonic Band",
+    "Wind Symphony",
+]
+
 # --------------------------------------------------
-# DOWNLOAD PAGE
+# LOAD PAGE IN A REAL BROWSER
 # --------------------------------------------------
 
-response = requests.get(URL, timeout=20)
-response.raise_for_status()
+with sync_playwright() as p:
+    browser = p.chromium.launch(headless=True)
+    page = browser.new_page()
 
-soup = BeautifulSoup(response.text, "html.parser")
+    page.goto(URL, wait_until="networkidle")
 
-# Important: use the page's visible text exactly as separate lines
+    # Give the schedule JS a moment to finish
+    page.wait_for_timeout(3000)
+
+    text = page.locator("body").inner_text()
+
+    browser.close()
+
 lines = [
     line.strip()
-    for line in soup.get_text("\n", strip=True).splitlines()
+    for line in text.splitlines()
     if line.strip()
 ]
 
@@ -59,9 +72,8 @@ for line in lines:
     if current_period is not None:
         periods[current_period].append(line)
 
-
 # --------------------------------------------------
-# PARSE RESERVATIONS
+# PARSE ROOM / STUDENT PAIRS
 # --------------------------------------------------
 
 def detect_room(line):
@@ -79,32 +91,31 @@ for period, entries in periods.items():
 
     while i < len(entries):
 
-        room = detect_room(entries[i])
+        line = entries[i]
+        room = detect_room(line)
 
         if room is None:
             i += 1
             continue
 
-        # The live page puts the student(s) on the NEXT line.
+        # The next rendered line is the student(s)
         if i + 1 < len(entries):
 
-            student_line = entries[i + 1].strip()
+            candidate = entries[i + 1].strip()
 
             if (
-                student_line.lower() != "unavailable"
-                and detect_room(student_line) is None
-                and not re.fullmatch(
-                    r"Period\s+\d+",
-                    student_line,
-                    re.IGNORECASE
-                )
+                candidate.lower() != "unavailable"
+                and detect_room(candidate) is None
+                and not candidate.lower().startswith("period")
             ):
-                reservations[period].append(
-                    (room, student_line)
-                )
+
+                # Extra safety: skip ensemble-only lines
+                if candidate not in ENSEMBLES:
+                    reservations[period].append(
+                        (room, candidate)
+                    )
 
         i += 2
-
 
 # --------------------------------------------------
 # COMBINE DUPLICATE ROOMS
@@ -119,23 +130,19 @@ for period, items in reservations.items():
         combined[period].setdefault(room, [])
 
         for name in names.split(","):
-
             name = name.strip()
 
             if name and name not in combined[period][room]:
                 combined[period][room].append(name)
-
 
 reservations = {i: [] for i in range(1, 11)}
 
 for period in range(1, 11):
 
     for room, names in combined[period].items():
-
         reservations[period].append(
             (room, ", ".join(names))
         )
-
 
 # --------------------------------------------------
 # CREATE IMAGE
@@ -149,13 +156,9 @@ img = Image.new(
 
 draw = ImageDraw.Draw(img)
 
-
 def font(size, bold=False):
     filename = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
     return ImageFont.truetype(filename, size)
-
-
-# HEADER
 
 draw.text(
     (70, 35),
@@ -177,11 +180,6 @@ draw.line(
     width=3
 )
 
-
-# --------------------------------------------------
-# PERIOD CARDS
-# --------------------------------------------------
-
 margin_x = 65
 top = 205
 gap = 18
@@ -191,7 +189,6 @@ card_width = int(
 )
 
 card_height = 390
-
 
 for period in range(1, 11):
 
@@ -251,12 +248,10 @@ for period in range(1, 11):
             room_font = font(20, True)
             name_font = font(19)
             spacing = 83
-
         elif count <= 4:
             room_font = font(18, True)
             name_font = font(17)
             spacing = 70
-
         else:
             room_font = font(16, True)
             name_font = font(15)
@@ -282,7 +277,6 @@ for period in range(1, 11):
             )
 
             y += spacing
-
 
 draw.text(
     (70, 1040),
