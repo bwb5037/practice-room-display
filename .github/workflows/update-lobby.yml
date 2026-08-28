@@ -8,16 +8,22 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: lobby-display
+  cancel-in-progress: false
+
 jobs:
   update:
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -25,15 +31,19 @@ jobs:
         run: pip install requests beautifulsoup4 pillow
 
       - name: Generate lobby image
-        run: python generate_lobby.py
+        run: |
+          python generate_lobby.py
+          cp lobby.png /tmp/lobby.png
 
-      - name: Commit updated image
+      - name: Save updated image
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git pull --rebase origin main
+          git fetch origin main
+          git reset --hard origin/main
 
+          cp /tmp/lobby.png lobby.png
           git add lobby.png
 
           if git diff --cached --quiet; then
