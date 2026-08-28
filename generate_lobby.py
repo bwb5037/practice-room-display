@@ -42,13 +42,11 @@ with sync_playwright() as p:
 
     browser.close()
 
-
 lines = [
     line.strip()
     for line in text.splitlines()
     if line.strip()
 ]
-
 
 # --------------------------------------------------
 # HELPERS
@@ -60,33 +58,17 @@ def is_room(line):
 
 def display_room(line):
     mapping = {
-        "PRACTICE ROOM 5 - PERCUSSION":
-            "Practice Room 5 - Percussion",
-
-        "PRACTICE ROOM 3":
-            "Practice Room 3",
-
-        "PRACTICE ROOM 2":
-            "Practice Room 2",
-
-        "MUSIC LIBRARY":
-            "Music Library",
-
-        "ORCHESTRA ROOM":
-            "Orchestra Room",
-
-        "BAND ROOM":
-            "Band Room",
-
-        "LUNCH TABLE":
-            "Lunch Table",
-
-        "PIANO LAB":
-            "Piano Lab",
+        "PRACTICE ROOM 5 - PERCUSSION": "Practice Room 5 - Percussion",
+        "PRACTICE ROOM 3": "Practice Room 3",
+        "PRACTICE ROOM 2": "Practice Room 2",
+        "MUSIC LIBRARY": "Music Library",
+        "ORCHESTRA ROOM": "Orchestra Room",
+        "BAND ROOM": "Band Room",
+        "LUNCH TABLE": "Lunch Table",
+        "PIANO LAB": "Piano Lab",
     }
 
     return mapping[line.upper()]
-
 
 # --------------------------------------------------
 # PARSE LIVE SCHEDULE
@@ -143,7 +125,6 @@ while i < len(lines):
         # ROOM
         # ENSEMBLE
         # STUDENT(S)
-
         if i + 2 < len(lines):
 
             student_line = lines[i + 2]
@@ -165,7 +146,6 @@ while i < len(lines):
                 continue
 
     i += 1
-
 
 # --------------------------------------------------
 # COMBINE DUPLICATE ROOMS
@@ -195,7 +175,6 @@ for period, items in reservations.items():
             ):
                 combined[period][room].append(name)
 
-
 reservations = {
     i: []
     for i in range(1, 11)
@@ -211,7 +190,6 @@ for period in range(1, 11):
                 ", ".join(names)
             )
         )
-
 
 # --------------------------------------------------
 # CREATE IMAGE
@@ -241,8 +219,9 @@ def font(size, bold=False):
 
 
 def wrap_text(text, chosen_font, max_width):
+
     words = text.split()
-    lines_out = []
+    output_lines = []
     current_line = ""
 
     for word in words:
@@ -261,17 +240,42 @@ def wrap_text(text, chosen_font, max_width):
 
         if text_width <= max_width:
             current_line = test_line
+
         else:
             if current_line:
-                lines_out.append(current_line)
+                output_lines.append(current_line)
 
             current_line = word
 
     if current_line:
-        lines_out.append(current_line)
+        output_lines.append(current_line)
 
-    return lines_out
+    return output_lines
 
+
+def estimate_card_height(items, room_font, name_font, max_width):
+
+    total = 0
+
+    for room, names in items:
+
+        room_lines = wrap_text(
+            room,
+            room_font,
+            max_width
+        )
+
+        name_lines = wrap_text(
+            names,
+            name_font,
+            max_width
+        )
+
+        total += len(room_lines) * (room_font.size + 2)
+        total += len(name_lines) * (name_font.size + 3)
+        total += 14
+
+    return total
 
 # --------------------------------------------------
 # HEADER
@@ -299,7 +303,6 @@ draw.line(
     width=3
 )
 
-
 # --------------------------------------------------
 # PERIOD CARDS
 # --------------------------------------------------
@@ -317,7 +320,6 @@ card_width = int(
 )
 
 card_height = 390
-
 
 for period in range(1, 11):
 
@@ -369,9 +371,8 @@ for period in range(1, 11):
         fill=(255, 255, 255)
     )
 
-    y = y1 + 92
-
     items = reservations[period]
+    y = y1 + 92
 
     if not items:
 
@@ -382,68 +383,80 @@ for period in range(1, 11):
             fill=(145, 145, 145)
         )
 
-    else:
+        continue
 
-        count = len(items)
+    max_text_width = card_width - 36
+    available_height = y2 - y - 18
 
-        if count <= 3:
-            room_font = font(20, True)
-            name_font = font(19)
+    # Start larger, then shrink until everything fits.
+    room_size = 20
+    name_size = 19
 
-        elif count <= 4:
-            room_font = font(18, True)
-            name_font = font(17)
+    while room_size >= 13:
 
-        else:
-            room_font = font(16, True)
-            name_font = font(15)
+        room_font = font(
+            room_size,
+            True
+        )
 
-        max_text_width = card_width - 36
+        name_font = font(
+            name_size
+        )
 
-        for room, names in items:
+        needed_height = estimate_card_height(
+            items,
+            room_font,
+            name_font,
+            max_text_width
+        )
 
-            if y > y2 - 55:
-                break
+        if needed_height <= available_height:
+            break
 
-            room_lines = wrap_text(
-                room,
-                room_font,
-                max_text_width
+        room_size -= 1
+        name_size = max(
+            12,
+            name_size - 1
+        )
+
+    # Draw all reservations
+    for room, names in items:
+
+        room_lines = wrap_text(
+            room,
+            room_font,
+            max_text_width
+        )
+
+        for room_line in room_lines:
+
+            draw.text(
+                (x1 + 18, y),
+                room_line,
+                font=room_font,
+                fill=(35, 35, 35)
             )
 
-            for room_line in room_lines:
+            y += room_font.size + 2
 
-                draw.text(
-                    (x1 + 18, y),
-                    room_line,
-                    font=room_font,
-                    fill=(35, 35, 35)
-                )
+        name_lines = wrap_text(
+            names,
+            name_font,
+            max_text_width
+        )
 
-                y += room_font.size + 3
+        for name_line in name_lines:
 
-            name_lines = wrap_text(
-                names,
-                name_font,
-                max_text_width
+            draw.text(
+                (x1 + 18, y),
+                name_line,
+                font=name_font,
+                fill=(85, 85, 85)
             )
 
-            for name_line in name_lines:
+            y += name_font.size + 3
 
-                if y > y2 - 25:
-                    break
-
-                draw.text(
-                    (x1 + 18, y),
-                    name_line,
-                    font=name_font,
-                    fill=(85, 85, 85)
-                )
-
-                y += name_font.size + 5
-
-            y += 20
-
+        y += 14
 
 # --------------------------------------------------
 # FOOTER
@@ -455,7 +468,6 @@ draw.text(
     font=font(20),
     fill=(120, 120, 120)
 )
-
 
 # --------------------------------------------------
 # SAVE
