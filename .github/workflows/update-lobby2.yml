@@ -40,7 +40,7 @@ jobs:
 
           echo "$TIMESTAMP" > /tmp/timestamp.txt
 
-      -      - name: Build PupCast playlist
+      - name: Build PupCast playlist
         run: |
           TIMESTAMP=$(cat /tmp/timestamp.txt)
 
