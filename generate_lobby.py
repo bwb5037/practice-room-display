@@ -179,9 +179,29 @@ for period in range(1, 11):
 
     for room, students in combined[period].items():
 
-        reservations[period].append(
-            (room, ", ".join(students))
-        )
+        clean_students = []
+
+        for student in students:
+
+            # Split again in case a combined string slipped through
+            parts = [
+                p.strip()
+                for p in student.split(",")
+                if p.strip()
+            ]
+
+            for part in parts:
+
+                if part in ensemble_names:
+                    continue
+
+                if part not in clean_students:
+                    clean_students.append(part)
+
+        if clean_students:
+            reservations[period].append(
+                (room, ", ".join(clean_students))
+            )
 
 # --------------------------------------------------
 # CREATE IMAGE
