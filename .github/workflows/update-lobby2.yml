@@ -28,9 +28,9 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-  run: |
-    pip install playwright pillow
-    playwright install --with-deps chromium
+        run: |
+          pip install playwright pillow
+          playwright install --with-deps chromium
 
       - name: Generate lobby image
         run: |
