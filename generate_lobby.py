@@ -75,6 +75,10 @@ while i < len(lines):
 # CLEAN ROOM / NAME PAIRS
 # --------------------------------------------------
 
+# --------------------------------------------------
+# CLEAN ROOM / NAME PAIRS
+# --------------------------------------------------
+
 room_names = {
     "Lunch Table",
     "Practice Room 2",
@@ -83,6 +87,13 @@ room_names = {
     "Band Room",
     "Orchestra Room",
     "Piano Lab",
+}
+
+ensemble_names = {
+    "String Orchestra",
+    "Concert Orchestra",
+    "Symphonic Band",
+    "Wind Symphony",
 }
 
 reservations = {i: [] for i in range(1, 11)}
@@ -97,21 +108,59 @@ for period, entries in periods.items():
 
         if entry in room_names:
 
-            # Next item should be reservation/name
-            if i + 1 < len(entries):
-                next_entry = entries[i + 1]
+            room = entry
+            j = i + 1
 
-                # If next entry isn't another room,
-                # treat it as the reservation
-                if next_entry not in room_names:
+            # Skip ensemble/class names after the room
+            while j < len(entries) and entries[j] in ensemble_names:
+                j += 1
+
+            # The next item should now be the student's name
+            if (
+                j < len(entries)
+                and entries[j] not in room_names
+                and entries[j].lower() != "unavailable"
+            ):
+                student = entries[j]
+
+                # Avoid accidentally treating another period marker as a name
+                if not student.lower().startswith("period"):
                     reservations[period].append(
-                        (entry, next_entry)
+                        (room, student)
                     )
-                    i += 2
-                    continue
 
-        i += 1
+            i = j + 1
 
+        else:
+            i += 1
+
+
+# --------------------------------------------------
+# COMBINE DUPLICATE ROOMS
+# --------------------------------------------------
+
+combined = {i: {} for i in range(1, 11)}
+
+for period, items in reservations.items():
+
+    for room, student in items:
+
+        if room not in combined[period]:
+            combined[period][room] = []
+
+        if student not in combined[period][room]:
+            combined[period][room].append(student)
+
+
+reservations = {i: [] for i in range(1, 11)}
+
+for period in range(1, 11):
+
+    for room, students in combined[period].items():
+
+        reservations[period].append(
+            (room, ", ".join(students))
+        )
 
 # --------------------------------------------------
 # CREATE IMAGE
