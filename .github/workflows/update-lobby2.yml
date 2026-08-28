@@ -28,7 +28,8 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install requests beautifulsoup4 pillow
+  run: pip install playwright pillow
+    playwright install --with-deps chromium
 
       - name: Generate lobby image
         run: |
