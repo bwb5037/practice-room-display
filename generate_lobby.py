@@ -1,7 +1,6 @@
 from playwright.sync_api import sync_playwright
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
-import re
 
 URL = "https://hersheyhsmusic.com/schedule"
 OUTPUT = "lobby.png"
@@ -105,11 +104,8 @@ while i < len(lines):
 
     line = lines[i]
 
-    # -------------------------------
     # PERIOD
     # 1
-    # -------------------------------
-
     if (
         line.upper() == "PERIOD"
         and i + 1 < len(lines)
@@ -124,10 +120,7 @@ while i < len(lines):
         i += 2
         continue
 
-    # -------------------------------
     # ROOM
-    # -------------------------------
-
     if (
         current_period is not None
         and is_room(line)
@@ -147,7 +140,6 @@ while i < len(lines):
             continue
 
         # Otherwise:
-        #
         # ROOM
         # ENSEMBLE
         # STUDENT(S)
@@ -155,9 +147,6 @@ while i < len(lines):
         if i + 2 < len(lines):
 
             student_line = lines[i + 2]
-
-            # Make sure the supposed student line
-            # isn't actually another structural item.
 
             if (
                 student_line.lower() != "unavailable"
@@ -251,7 +240,42 @@ def font(size, bold=False):
     )
 
 
+def wrap_text(text, chosen_font, max_width):
+    words = text.split()
+    lines_out = []
+    current_line = ""
+
+    for word in words:
+
+        test_line = (
+            current_line + " " + word
+        ).strip()
+
+        bbox = draw.textbbox(
+            (0, 0),
+            test_line,
+            font=chosen_font
+        )
+
+        text_width = bbox[2] - bbox[0]
+
+        if text_width <= max_width:
+            current_line = test_line
+        else:
+            if current_line:
+                lines_out.append(current_line)
+
+            current_line = word
+
+    if current_line:
+        lines_out.append(current_line)
+
+    return lines_out
+
+
+# --------------------------------------------------
 # HEADER
+# --------------------------------------------------
 
 draw.text(
     (70, 35),
@@ -365,41 +389,65 @@ for period in range(1, 11):
         if count <= 3:
             room_font = font(20, True)
             name_font = font(19)
-            spacing = 83
 
         elif count <= 4:
             room_font = font(18, True)
             name_font = font(17)
-            spacing = 70
 
         else:
             room_font = font(16, True)
             name_font = font(15)
-            spacing = 58
+
+        max_text_width = card_width - 36
 
         for room, names in items:
 
             if y > y2 - 55:
                 break
 
-            draw.text(
-                (x1 + 18, y),
+            room_lines = wrap_text(
                 room,
-                font=room_font,
-                fill=(35, 35, 35)
+                room_font,
+                max_text_width
             )
 
-            draw.text(
-                (x1 + 18, y + 28),
+            for room_line in room_lines:
+
+                draw.text(
+                    (x1 + 18, y),
+                    room_line,
+                    font=room_font,
+                    fill=(35, 35, 35)
+                )
+
+                y += room_font.size + 3
+
+            name_lines = wrap_text(
                 names,
-                font=name_font,
-                fill=(85, 85, 85)
+                name_font,
+                max_text_width
             )
 
-            y += spacing
+            for name_line in name_lines:
+
+                if y > y2 - 25:
+                    break
+
+                draw.text(
+                    (x1 + 18, y),
+                    name_line,
+                    font=name_font,
+                    fill=(85, 85, 85)
+                )
+
+                y += name_font.size + 5
+
+            y += 20
 
 
+# --------------------------------------------------
 # FOOTER
+# --------------------------------------------------
 
 draw.text(
     (70, 1040),
@@ -409,7 +457,9 @@ draw.text(
 )
 
 
+# --------------------------------------------------
 # SAVE
+# --------------------------------------------------
 
 img.save(OUTPUT)
 
