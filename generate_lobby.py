@@ -75,14 +75,6 @@ while i < len(lines):
 # CLEAN ROOM / NAME PAIRS
 # --------------------------------------------------
 
-# --------------------------------------------------
-# CLEAN ROOM / NAME PAIRS
-# --------------------------------------------------
-
-# --------------------------------------------------
-# CLEAN ROOM / NAME PAIRS
-# --------------------------------------------------
-
 room_names = {
     "Lunch Table",
     "Practice Room 2",
@@ -108,52 +100,52 @@ for period, entries in periods.items():
 
     while i < len(entries):
 
-        entry = entries[i]
-
-        if entry in room_names:
-
-            room = entry
-            j = i + 1
-
-            # Skip any ensemble/class labels
-            while j < len(entries):
-
-                candidate = entries[j]
-
-                # Stop if we've reached another room
-                if candidate in room_names:
-                    break
-
-                # Skip unavailable
-                if candidate.lower() == "unavailable":
-                    j += 1
-                    continue
-
-                # Skip any line containing ensemble names
-                # even if multiple ensembles are listed together
-                contains_ensemble = any(
-                    ensemble.lower() in candidate.lower()
-                    for ensemble in ensemble_names
-                )
-
-                if contains_ensemble:
-                    j += 1
-                    continue
-
-                # Anything else should be the student name(s)
-                student = candidate
-
-                if not student.lower().startswith("period"):
-                    reservations[period].append(
-                        (room, student)
-                    )
-
-                break
-
-            i = max(j + 1, i + 1)
-
-        else:
+        if entries[i] not in room_names:
             i += 1
+            continue
+
+        room = entries[i]
+        j = i + 1
+        students = []
+
+        # Read everything belonging to this room
+        # until we reach the next room.
+        while j < len(entries) and entries[j] not in room_names:
+
+            candidate = entries[j].strip()
+
+            if candidate.lower() == "unavailable":
+                j += 1
+                continue
+
+            # Split comma-separated content
+            parts = [
+                part.strip()
+                for part in candidate.split(",")
+                if part.strip()
+            ]
+
+            # Remove ensemble/class names but preserve people
+            cleaned_parts = []
+
+            for part in parts:
+                if part not in ensemble_names:
+                    cleaned_parts.append(part)
+
+            if cleaned_parts:
+                students.extend(cleaned_parts)
+
+            j += 1
+
+        if students:
+            # Remove duplicates while preserving order
+            students = list(dict.fromkeys(students))
+
+            reservations[period].append(
+                (room, ", ".join(students))
+            )
+
+        i = j
 
 
 # --------------------------------------------------
@@ -164,13 +156,20 @@ combined = {i: {} for i in range(1, 11)}
 
 for period, items in reservations.items():
 
-    for room, student in items:
+    for room, student_string in items:
 
         if room not in combined[period]:
             combined[period][room] = []
 
-        if student not in combined[period][room]:
-            combined[period][room].append(student)
+        students = [
+            name.strip()
+            for name in student_string.split(",")
+            if name.strip()
+        ]
+
+        for student in students:
+            if student not in combined[period][room]:
+                combined[period][room].append(student)
 
 
 reservations = {i: [] for i in range(1, 11)}
