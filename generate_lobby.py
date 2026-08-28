@@ -21,10 +21,7 @@ ROOM_NAMES = [
     "Piano Lab",
 ]
 
-# --------------------------------------------------
-# GET PAGE
-# --------------------------------------------------
-
+# Get webpage
 response = requests.get(URL, timeout=20)
 response.raise_for_status()
 
@@ -36,14 +33,24 @@ lines = [
     if line.strip()
 ]
 
-# --------------------------------------------------
-# PARSE PERIODS
-# --------------------------------------------------
-
+# Parse periods
 periods = {i: [] for i in range(1, 11)}
 current_period = None
 
-for line in lines:
+i = 0
+
+while i < len(lines):
+
+    line = lines[i]
+
+    if line == "Period" and i + 1 < len(lines):
+        if lines[i + 1].isdigit():
+            number = int(lines[i + 1])
+
+            if 1 <= number <= 10:
+                current_period = number
+                i += 2
+                continue
 
     match = re.match(r"^Period\s+(\d+)$", line, re.IGNORECASE)
 
@@ -52,17 +59,14 @@ for line in lines:
 
         if 1 <= number <= 10:
             current_period = number
-
-        continue
+            i += 1
+            continue
 
     if current_period is not None:
         periods[current_period].append(line)
 
-# --------------------------------------------------
-# FIND ROOM + STUDENT PAIRS
-# --------------------------------------------------
+    i += 1
 
-reservations = {i: [] for i in range(1, 11)}
 
 def detect_room(line):
     for room in ROOM_NAMES:
@@ -70,6 +74,9 @@ def detect_room(line):
             return room
     return None
 
+
+# Parse reservations
+reservations = {i: [] for i in range(1, 11)}
 
 for period, entries in periods.items():
 
@@ -84,68 +91,52 @@ for period, entries in periods.items():
             i += 1
             continue
 
-        # The next line contains either the student(s)
-        # or "Unavailable"
-        if i + 1 >= len(entries):
-            i += 1
-            continue
+        # Find the next line after the room/ensemble line
+        if i + 1 < len(entries):
 
-        student_line = entries[i + 1].strip()
+            next_line = entries[i + 1].strip()
 
-        if student_line.lower() == "unavailable":
-            i += 2
-            continue
-
-        # Safety: don't treat another room as a student
-        if detect_room(student_line):
-            i += 1
-            continue
-
-        reservations[period].append(
-            (room, student_line)
-        )
+            if (
+                next_line.lower() != "unavailable"
+                and detect_room(next_line) is None
+                and not next_line.lower().startswith("period")
+            ):
+                reservations[period].append(
+                    (room, next_line)
+                )
 
         i += 2
 
 
-# --------------------------------------------------
-# COMBINE DUPLICATE ROOMS
-# --------------------------------------------------
-
+# Combine duplicate rooms
 combined = {i: {} for i in range(1, 11)}
 
 for period, items in reservations.items():
 
-    for room, student_string in items:
+    for room, names in items:
 
-        combined[period].setdefault(room, [])
+        if room not in combined[period]:
+            combined[period][room] = []
 
-        students = [
-            student.strip()
-            for student in student_string.split(",")
-            if student.strip()
-        ]
+        for name in names.split(","):
+            name = name.strip()
 
-        for student in students:
-            if student not in combined[period][room]:
-                combined[period][room].append(student)
+            if name and name not in combined[period][room]:
+                combined[period][room].append(name)
 
 
 reservations = {i: [] for i in range(1, 11)}
 
 for period in range(1, 11):
 
-    for room, students in combined[period].items():
+    for room, names in combined[period].items():
 
         reservations[period].append(
-            (room, ", ".join(students))
+            (room, ", ".join(names))
         )
 
 
-# --------------------------------------------------
-# CREATE IMAGE
-# --------------------------------------------------
-
+# Create image
 img = Image.new(
     "RGB",
     (WIDTH, HEIGHT),
@@ -160,8 +151,7 @@ def font(size, bold=False):
     return ImageFont.truetype(filename, size)
 
 
-# HEADER
-
+# Header
 draw.text(
     (70, 35),
     "PRACTICE ROOM RESERVATIONS",
@@ -183,10 +173,7 @@ draw.line(
 )
 
 
-# --------------------------------------------------
-# PERIOD CARDS
-# --------------------------------------------------
-
+# Cards
 margin_x = 65
 top = 205
 gap = 18
