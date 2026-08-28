@@ -10,35 +10,25 @@ WIDTH = 1920
 HEIGHT = 1080
 
 ROOM_NAMES = [
-    "Practice Room 5 - Percussion",
-    "Practice Room 3",
-    "Practice Room 2",
-    "Music Library",
-    "Orchestra Room",
-    "Band Room",
-    "Lunch Table",
-    "Piano Lab",
-]
-
-ENSEMBLES = [
-    "String Orchestra",
-    "Concert Orchestra",
-    "Symphonic Band",
-    "Wind Symphony",
+    "PRACTICE ROOM 5 - PERCUSSION",
+    "PRACTICE ROOM 3",
+    "PRACTICE ROOM 2",
+    "MUSIC LIBRARY",
+    "ORCHESTRA ROOM",
+    "BAND ROOM",
+    "LUNCH TABLE",
+    "PIANO LAB",
 ]
 
 # --------------------------------------------------
-# LOAD PAGE WITH PLAYWRIGHT
+# LOAD LIVE PAGE
 # --------------------------------------------------
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
 
     page = browser.new_page(
-        viewport={
-            "width": 1920,
-            "height": 1080
-        }
+        viewport={"width": 1920, "height": 1080}
     )
 
     page.goto(
@@ -47,24 +37,12 @@ with sync_playwright() as p:
         timeout=60000
     )
 
-    # Give the site's JavaScript time to finish
-    page.wait_for_timeout(5000)
+    page.wait_for_timeout(3000)
 
     text = page.locator("body").inner_text()
 
-    # DEBUG: show exactly what Playwright sees
-    print("")
-    print("--- RAW PAGE TEXT START ---")
-    print(text)
-    print("--- RAW PAGE TEXT END ---")
-    print("")
-
     browser.close()
 
-
-# --------------------------------------------------
-# TURN PAGE TEXT INTO LINES
-# --------------------------------------------------
 
 lines = [
     line.strip()
@@ -74,43 +52,70 @@ lines = [
 
 
 # --------------------------------------------------
-# PARSE PERIODS
+# HELPERS
 # --------------------------------------------------
 
-periods = {i: [] for i in range(1, 11)}
-current_period = None
+def is_room(line):
+    return line.upper() in ROOM_NAMES
 
+
+def display_room(line):
+    mapping = {
+        "PRACTICE ROOM 5 - PERCUSSION":
+            "Practice Room 5 - Percussion",
+
+        "PRACTICE ROOM 3":
+            "Practice Room 3",
+
+        "PRACTICE ROOM 2":
+            "Practice Room 2",
+
+        "MUSIC LIBRARY":
+            "Music Library",
+
+        "ORCHESTRA ROOM":
+            "Orchestra Room",
+
+        "BAND ROOM":
+            "Band Room",
+
+        "LUNCH TABLE":
+            "Lunch Table",
+
+        "PIANO LAB":
+            "Piano Lab",
+    }
+
+    return mapping[line.upper()]
+
+
+# --------------------------------------------------
+# PARSE LIVE SCHEDULE
+# --------------------------------------------------
+
+reservations = {
+    i: []
+    for i in range(1, 11)
+}
+
+current_period = None
 i = 0
 
 while i < len(lines):
 
     line = lines[i]
 
-    # Case 1:
-    # Period 4
-    match = re.fullmatch(
-        r"Period\s+(\d+)",
-        line,
-        re.IGNORECASE
-    )
+    # -------------------------------
+    # PERIOD
+    # 1
+    # -------------------------------
 
-    if match:
-        number = int(match.group(1))
-
-        if 1 <= number <= 10:
-            current_period = number
-
-        i += 1
-        continue
-
-    # Case 2:
-    # Period
-    # 4
     if (
-        line.lower() == "period"
+        line.upper() == "PERIOD"
         and i + 1 < len(lines)
         and lines[i + 1].isdigit()
     ):
+
         number = int(lines[i + 1])
 
         if 1 <= number <= 10:
@@ -119,85 +124,68 @@ while i < len(lines):
         i += 2
         continue
 
-    if current_period is not None:
-        periods[current_period].append(line)
+    # -------------------------------
+    # ROOM
+    # -------------------------------
 
-    i += 1
+    if (
+        current_period is not None
+        and is_room(line)
+    ):
 
+        room = display_room(line)
 
-# --------------------------------------------------
-# ROOM DETECTION
-# --------------------------------------------------
-
-def detect_room(line):
-    for room in ROOM_NAMES:
-        if line.startswith(room):
-            return room
-
-    return None
-
-
-# --------------------------------------------------
-# PARSE RESERVATIONS
-# --------------------------------------------------
-
-reservations = {i: [] for i in range(1, 11)}
-
-for period, entries in periods.items():
-
-    i = 0
-
-    while i < len(entries):
-
-        line = entries[i]
-        room = detect_room(line)
-
-        if room is None:
+        if i + 1 >= len(lines):
             i += 1
             continue
 
-        if i + 1 >= len(entries):
-            i += 1
-            continue
+        next_line = lines[i + 1]
 
-        candidate = entries[i + 1].strip()
-
-        # Ignore unavailable rooms
-        if candidate.lower() == "unavailable":
+        # ROOM -> Unavailable
+        if next_line.lower() == "unavailable":
             i += 2
             continue
 
-        # Don't mistake another room for a student
-        if detect_room(candidate) is not None:
-            i += 1
-            continue
+        # Otherwise:
+        #
+        # ROOM
+        # ENSEMBLE
+        # STUDENT(S)
 
-        # Don't mistake a period marker for a student
-        if re.fullmatch(
-            r"Period\s+\d+",
-            candidate,
-            re.IGNORECASE
-        ):
-            i += 1
-            continue
+        if i + 2 < len(lines):
 
-        # Don't use an ensemble-only line as a student
-        if candidate in ENSEMBLES:
-            i += 1
-            continue
+            student_line = lines[i + 2]
 
-        reservations[period].append(
-            (room, candidate)
-        )
+            # Make sure the supposed student line
+            # isn't actually another structural item.
 
-        i += 2
+            if (
+                student_line.lower() != "unavailable"
+                and student_line.upper() != "PERIOD"
+                and not is_room(student_line)
+            ):
+
+                reservations[current_period].append(
+                    (
+                        room,
+                        student_line
+                    )
+                )
+
+                i += 3
+                continue
+
+    i += 1
 
 
 # --------------------------------------------------
 # COMBINE DUPLICATE ROOMS
 # --------------------------------------------------
 
-combined = {i: {} for i in range(1, 11)}
+combined = {
+    i: {}
+    for i in range(1, 11)
+}
 
 for period, items in reservations.items():
 
@@ -263,9 +251,7 @@ def font(size, bold=False):
     )
 
 
-# --------------------------------------------------
 # HEADER
-# --------------------------------------------------
 
 draw.text(
     (70, 35),
@@ -328,7 +314,6 @@ for period in range(1, 11):
     x2 = x1 + card_width
     y2 = y1 + card_height
 
-    # Card
     draw.rounded_rectangle(
         (x1, y1, x2, y2),
         radius=18,
@@ -337,7 +322,6 @@ for period in range(1, 11):
         width=2
     )
 
-    # Dark period header
     draw.rounded_rectangle(
         (x1, y1, x2, y1 + 70),
         radius=18,
@@ -379,19 +363,16 @@ for period in range(1, 11):
         count = len(items)
 
         if count <= 3:
-
             room_font = font(20, True)
             name_font = font(19)
             spacing = 83
 
         elif count <= 4:
-
             room_font = font(18, True)
             name_font = font(17)
             spacing = 70
 
         else:
-
             room_font = font(16, True)
             name_font = font(15)
             spacing = 58
@@ -418,9 +399,7 @@ for period in range(1, 11):
             y += spacing
 
 
-# --------------------------------------------------
 # FOOTER
-# --------------------------------------------------
 
 draw.text(
     (70, 1040),
@@ -430,9 +409,7 @@ draw.text(
 )
 
 
-# --------------------------------------------------
 # SAVE
-# --------------------------------------------------
 
 img.save(OUTPUT)
 
