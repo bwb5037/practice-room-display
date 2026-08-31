@@ -35,7 +35,7 @@ jobs:
           TIMESTAMP=$(cat /tmp/timestamp.txt)
           cat > /tmp/media.csv <<EOF
           Title,URL,Description,Type,DisplayDuration
-          Practice Room Schedule,https://raw.githubusercontent.com/bwb5037/practice-room-display/refs/heads/main/lobby-$TIMESTAMP.png?v=$TIMESTAMP,Daily practice room schedule,Photo,30
+          Practice Room Schedule,https://tiny-bunny-5b7917.netlify.app/lobby-$TIMESTAMP.png,Daily practice room schedule,Photo,30
           EOF
       - name: Save updated files
         run: |
