@@ -1,8 +1,9 @@
 name: Update Lobby Display
 on:
+  on:
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"   # runs every 5 minutes, matching the schedule site's own refresh
+    - cron: "*/5 * * * *"
 permissions:
   contents: write
 concurrency:
