@@ -1,57 +1,76 @@
 name: Update Lobby Display
+
 on:
   workflow_dispatch:
   schedule:
     - cron: "*/5 * * * *"
+
 permissions:
   contents: write
+
 concurrency:
   group: lobby-display
   cancel-in-progress: false
+
 jobs:
   update:
     runs-on: ubuntu-latest
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+
       - name: Install dependencies
         run: |
           pip install playwright pillow
           playwright install --with-deps chromium
+
       - name: Generate lobby image
         run: |
           python generate_lobby.py
+
           TIMESTAMP=$(date +%s)
+
           cp lobby.png "/tmp/lobby-$TIMESTAMP.png"
+
           echo "$TIMESTAMP" > /tmp/timestamp.txt
+
       - name: Build WildStream playlist
         run: |
           TIMESTAMP=$(cat /tmp/timestamp.txt)
+
           cat > /tmp/media.csv <<EOF
           Title,URL,Description,Type,DisplayDuration
-          Practice Room Schedule,https://practice-room-proxy.bwb5037.workers.dev/lobby-$TIMESTAMP.png,Daily practice room schedule,Photo,30
+          Practice Room Schedule,https://raw.githubusercontent.com/bwb5037/practice-room-display/refs/heads/main/lobby-$TIMESTAMP.png,Practice room reservations,Photo,3600
           EOF
+
       - name: Save updated files
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git fetch origin main
           git reset --hard origin/main
+
           TIMESTAMP=$(cat /tmp/timestamp.txt)
+
           cp "/tmp/lobby-$TIMESTAMP.png" "lobby-$TIMESTAMP.png"
           cp "/tmp/lobby-$TIMESTAMP.png" lobby.png
           cp /tmp/media.csv media.csv
-          # Remove previous timestamped lobby images
+
           find . -maxdepth 1 -type f -name 'lobby-*.png' \
             ! -name "lobby-$TIMESTAMP.png" \
             -delete
+
           git add -A
+
           if git diff --cached --quiet; then
             echo "No changes to commit"
           else
