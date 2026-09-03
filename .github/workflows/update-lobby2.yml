@@ -1,6 +1,5 @@
 name: Update Lobby Display
 on:
-  on:
   workflow_dispatch:
   schedule:
     - cron: "*/5 * * * *"
